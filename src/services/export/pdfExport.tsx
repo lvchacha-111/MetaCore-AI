@@ -1,13 +1,10 @@
 import { Document, Page, Text, View, StyleSheet, Font, pdf } from '@react-pdf/renderer'
 import type { Project } from '@/types/project'
 
-// 注册中文字体（思源黑体 Noto Sans SC）
+// 注册中文字体（黑体）
 Font.register({
   family: 'NotoSansSC',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/notosanssc/v37/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.ttf' },
-    { src: 'https://fonts.gstatic.com/s/notosanssc/v37/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_Fn0JKbPzS5HE.ttf', fontWeight: 'bold' },
-  ],
+  src: '/fonts/simhei.ttf',
 })
 
 const colors = {
