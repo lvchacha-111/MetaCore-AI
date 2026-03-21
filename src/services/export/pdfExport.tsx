@@ -1,5 +1,14 @@
-import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Font, pdf } from '@react-pdf/renderer'
 import type { Project } from '@/types/project'
+
+// 注册中文字体（思源黑体 Noto Sans SC）
+Font.register({
+  family: 'NotoSansSC',
+  fonts: [
+    { src: 'https://fonts.gstatic.com/s/notosanssc/v37/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.ttf' },
+    { src: 'https://fonts.gstatic.com/s/notosanssc/v37/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_Fn0JKbPzS5HE.ttf', fontWeight: 'bold' },
+  ],
+})
 
 const colors = {
   primary: '#6366f1',
@@ -18,7 +27,7 @@ const styles = StyleSheet.create({
   page: {
     backgroundColor: colors.darkBg,
     padding: 40,
-    fontFamily: 'Helvetica',
+    fontFamily: 'NotoSansSC',
   },
   coverPage: {
     flex: 1,
@@ -33,7 +42,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     color: colors.text,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'NotoSansSC',
+    fontWeight: 'bold',
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -84,7 +94,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     color: colors.text,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'NotoSansSC',
+    fontWeight: 'bold',
     marginBottom: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
@@ -110,7 +121,8 @@ const styles = StyleSheet.create({
   tableHeaderCell: {
     fontSize: 8,
     color: colors.muted,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'NotoSansSC',
+    fontWeight: 'bold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -145,7 +157,8 @@ const styles = StyleSheet.create({
   bomTotalValue: {
     fontSize: 12,
     color: colors.green,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'NotoSansSC',
+    fontWeight: 'bold',
   },
   pageNumber: {
     position: 'absolute',
