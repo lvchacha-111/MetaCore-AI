@@ -9,7 +9,7 @@ interface Props {
 }
 
 // 芯片引脚定义（标准布局）
-const CHIP_DEFS: Record<ChipTarget, { name: string; totalPins: number; leftPins: string[]; rightPins: string[] }> = {
+const CHIP_DEFS: Record<string, { name: string; totalPins: number; leftPins: string[]; rightPins: string[] }> = {
   'ESP32': {
     name: 'ESP32-WROOM-32',
     totalPins: 38,
@@ -38,20 +38,11 @@ const CHIP_DEFS: Record<ChipTarget, { name: string; totalPins: number; leftPins:
 
 // 电源/地线/特殊引脚颜色
 const POWER_COLORS: Record<string, string> = {
-  '3V3': '#22c55e',
-  '3.3V': '#22c55e',
-  '5V': '#f59e0b',
-  'GND': '#ef4444',
-  'VCC': '#22c55e',
-  'VBAT': '#f59e0b',
-  'VDD': '#22c55e',
-  'VSSA': '#ef4444',
-  'VDDA': '#22c55e',
-  'VSS': '#ef4444',
-  'VCAP': '#8b5cf6',
-  'EN': '#6366f1',
-  'NRST': '#ef4444',
-  'BOOT0': '#6366f1',
+  '3V3': '#22c55e', '3.3V': '#22c55e', '5V': '#f59e0b',
+  'GND': '#ef4444', 'VCC': '#22c55e', 'VBAT': '#f59e0b',
+  'VDD': '#22c55e', 'VSSA': '#ef4444', 'VDDA': '#22c55e',
+  'VSS': '#ef4444', 'VCAP': '#8b5cf6', 'EN': '#6366f1',
+  'NRST': '#ef4444', 'BOOT0': '#6366f1',
 }
 
 /** 判断是否为电源引脚 */
@@ -62,7 +53,7 @@ const isPowerPin = (name: string) =>
 const isGndPin = (name: string) =>
   ['GND', 'VSS', 'VSSA'].some(k => name.includes(k))
 
-/** 判断是否为特殊功能引脚（复位、使能、启动配置等） */
+/** 判断是否为特殊功能引脚 */
 const isSpecialPin = (name: string) =>
   ['EN', 'NRST', 'BOOT0'].some(k => name.includes(k))
 
@@ -74,11 +65,14 @@ function getPinColor(pinName: string): string {
   return '#6366f1'
 }
 
-/**
- * 芯片引脚图组件
- * @description 按照芯片封装渲染 SVG 引脚图，支持鼠标悬停查看连接详情，
- *              电源/GND/特殊引脚始终着色，支持亮色/暗色主题
- */
+// ─── 布局常量 ───
+const SVG_WIDTH = 700
+const CHIP_WIDTH = 160
+const PIN_LENGTH = 44
+const ROW_HEIGHT = 30
+const FONT_SIZE = 11
+const CHIP_FONT_SIZE = 12
+
 export default function PinDiagram({ pins, chipType }: Props) {
   const [hoveredPin, setHoveredPin] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; pin: PinAssignment } | null>(null)
@@ -95,13 +89,39 @@ export default function PinDiagram({ pins, chipType }: Props) {
     if (pin.pinNumber.startsWith('IO')) pinMap.set('GPIO' + pin.pinNumber.slice(2), pin)
   }
 
-  const SVG_WIDTH = 480
-  const CHIP_HEIGHT = Math.max(chipDef.leftPins.length, chipDef.rightPins.length) * 28 + 40
-  const CHIP_WIDTH = 220
-  const PIN_LENGTH = 36
-  const ROW_START_Y = (CHIP_HEIGHT - (Math.max(chipDef.leftPins.length, chipDef.rightPins.length) * 28)) / 2 + 14
+  const totalRows = Math.max(chipDef.leftPins.length, chipDef.rightPins.length)
+  const CHIP_HEIGHT = totalRows * ROW_HEIGHT + 50
+  const ROW_START_Y = (CHIP_HEIGHT - totalRows * ROW_HEIGHT) / 2 + 15
 
-  /** 处理引脚悬停事件，定位 tooltip 并显示连接信息 */
+  // 芯片主体 x 坐标
+  const chipX = (SVG_WIDTH - CHIP_WIDTH) / 2
+
+  /** 计算单个引脚的渲染样式 */
+  function getPinStyles(pinName: string, isHovered: boolean, hasConnection: boolean) {
+    const pinColor = getPinColor(pinName)
+    const alwaysColored = isPowerPin(pinName) || isGndPin(pinName) || isSpecialPin(pinName)
+    const colored = alwaysColored || hasConnection
+
+    const fill = colored
+      ? (isHovered ? pinColor : `${pinColor}88`)
+      : (isDark ? '#1e293b' : '#cbd5e1')
+
+    const stroke = colored ? pinColor : (isDark ? '#334155' : '#94a3b8')
+    const strokeWidth = isHovered ? 2 : 0.5
+
+    let textFill: string
+    if (alwaysColored) {
+      textFill = pinColor
+    } else if (hasConnection) {
+      textFill = isDark ? '#e2e8f0' : '#1e293b'
+    } else {
+      textFill = isDark ? '#64748b' : '#64748b'
+    }
+
+    return { pinColor, fill, stroke, strokeWidth, textFill }
+  }
+
+  /** 处理引脚悬停 */
   function handlePinHover(pinName: string, side: 'left' | 'right', idx: number, e: React.MouseEvent) {
     setHoveredPin(`${side}-${idx}`)
     const assignment = pinMap.get(pinName)
@@ -111,212 +131,150 @@ export default function PinDiagram({ pins, chipType }: Props) {
     }
   }
 
-  /** 清除引脚悬停状态并隐藏 tooltip */
   function handlePinLeave() {
     setHoveredPin(null)
     setTooltip(null)
   }
 
-  /**
-   * 计算单个引脚的渲染样式（fill、stroke、textFill）
-   * @param pinName - 引脚名称（如 PA0、VDD、GND）
-   * @param isHovered - 当前是否处于悬停状态
-   * @param hasConnection - 是否有连接分配
-   */
-  function getPinStyles(pinName: string, isHovered: boolean, hasConnection: boolean) {
-    const pinColor = getPinColor(pinName)
-    const alwaysColored = isPowerPin(pinName) || isGndPin(pinName) || isSpecialPin(pinName)
-    const colored = alwaysColored || hasConnection
+  /** 渲染一侧的引脚 */
+  function renderPins(pinList: string[], side: 'left' | 'right') {
+    return pinList.map((pinName, idx) => {
+      const y = ROW_START_Y + idx * ROW_HEIGHT
+      const isHovered = hoveredPin === `${side}-${idx}`
+      const assignment = pinMap.get(pinName)
+      const hasConnection = !!assignment
+      const { pinColor, fill, stroke, strokeWidth, textFill } = getPinStyles(pinName, isHovered, hasConnection)
 
-    const fill = colored
-      ? (isHovered ? pinColor : `${pinColor}99`)
-      : (isDark ? '#1e293b' : '#cbd5e1')
+      const isLeft = side === 'left'
+      // 引脚条 x 坐标
+      const pinX = isLeft ? chipX - PIN_LENGTH : chipX + CHIP_WIDTH
+      // 文字 x 坐标（在引脚条外侧）
+      const textX = isLeft ? pinX - 6 : pinX + PIN_LENGTH + 6
+      const anchor = isLeft ? 'end' : 'start'
+      // 连接点 x 坐标
+      const dotX = isLeft ? pinX - 4 : pinX + PIN_LENGTH + 4
 
-    const stroke = colored ? pinColor : (isDark ? '#334155' : '#94a3b8')
-
-    let textFill: string
-    if (alwaysColored) {
-      textFill = pinColor
-    } else if (hasConnection) {
-      textFill = '#e2e8f0'
-    } else {
-      textFill = isDark ? '#475569' : '#64748b'
-    }
-
-    return { pinColor, fill, stroke, textFill }
+      return (
+        <g key={`${side}-${idx}`}>
+          {/* 引脚条 */}
+          <rect
+            x={pinX}
+            y={y - 8}
+            width={PIN_LENGTH}
+            height={16}
+            rx={3}
+            fill={fill}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            className="cursor-pointer transition-all duration-150"
+            onMouseEnter={(e) => handlePinHover(pinName, side, idx, e)}
+            onMouseLeave={handlePinLeave}
+          />
+          {/* 引脚名称 */}
+          <text
+            x={textX}
+            y={y + 1}
+            textAnchor={anchor}
+            fill={textFill}
+            fontSize={FONT_SIZE}
+            fontWeight={hasConnection || isPowerPin(pinName) || isGndPin(pinName) ? 600 : 400}
+            fontFamily="'JetBrains Mono', 'Fira Code', monospace"
+          >
+            {pinName.length > 8 ? pinName.slice(0, 7) + '…' : pinName}
+          </text>
+          {/* 连接指示点 */}
+          {hasConnection && (
+            <circle cx={dotX} cy={y} r={3.5} fill={pinColor} />
+          )}
+        </g>
+      )
+    })
   }
+
+  // 主题相关的渐变 ID（避免多实例冲突）
+  const gradientId = `chipGrad-${chipType}`
+  const borderGradId = `chipBorder-${chipType}`
 
   return (
     <div className="relative">
+      {/* 芯片标题 */}
       <div className="flex items-center justify-center mb-4">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+        <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border ${
+          isDark ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-200'
+        }`}>
           <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-          <span className="text-xs text-indigo-400 font-medium">{chipDef.name} · {chipDef.totalPins} Pin</span>
+          <span className={`text-xs font-medium ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
+            {chipDef.name} · {chipDef.totalPins} Pin
+          </span>
         </div>
       </div>
 
-      {/* 芯片 SVG */}
-      <div className="flex justify-center">
+      {/* SVG 引脚图（支持横向滚动） */}
+      <div className="flex justify-center overflow-x-auto">
         <svg
           width={SVG_WIDTH}
           height={CHIP_HEIGHT}
           viewBox={`0 0 ${SVG_WIDTH} ${CHIP_HEIGHT}`}
-          className="overflow-visible"
+          className="overflow-visible flex-shrink-0"
         >
+          {/* 渐变定义 */}
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={isDark ? '#1e1b4b' : '#e0e7ff'} />
+              <stop offset="100%" stopColor={isDark ? '#0f0a2e' : '#f0f4ff'} />
+            </linearGradient>
+            <linearGradient id={borderGradId} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={isDark ? '#6366f1' : '#818cf8'} stopOpacity={0.6} />
+              <stop offset="100%" stopColor={isDark ? '#8b5cf6' : '#a5b4fc'} stopOpacity={0.3} />
+            </linearGradient>
+          </defs>
+
           {/* 芯片主体 */}
           <rect
-            x={(SVG_WIDTH - CHIP_WIDTH) / 2}
+            x={chipX}
             y={0}
             width={CHIP_WIDTH}
             height={CHIP_HEIGHT}
-            rx={12}
-            ry={12}
-            fill="url(#chipGradient)"
-            stroke="url(#chipBorder)"
+            rx={10}
+            ry={10}
+            fill={`url(#${gradientId})`}
+            stroke={`url(#${borderGradId})`}
             strokeWidth={2}
-            className="filter drop-shadow-xl"
-            style={{ filter: 'drop-shadow(0 8px 32px rgba(99,102,241,0.15))' }}
+            style={{ filter: isDark
+              ? 'drop-shadow(0 8px 24px rgba(99,102,241,0.15))'
+              : 'drop-shadow(0 4px 16px rgba(99,102,241,0.1))'
+            }}
           />
 
           {/* 芯片顶部标签 */}
           <rect
-            x={(SVG_WIDTH - CHIP_WIDTH) / 2 + 10}
+            x={chipX + 8}
             y={10}
-            width={CHIP_WIDTH - 20}
-            height={36}
+            width={CHIP_WIDTH - 16}
+            height={32}
             rx={6}
-            fill="rgba(99,102,241,0.15)"
+            fill={isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)'}
           />
           <text
             x={SVG_WIDTH / 2}
             y={30}
             textAnchor="middle"
-            fill="#a5b4fc"
-            fontSize={11}
+            fill={isDark ? '#a5b4fc' : '#4f46e5'}
+            fontSize={CHIP_FONT_SIZE}
             fontWeight={600}
-            fontFamily="JetBrains Mono, monospace"
+            fontFamily="'JetBrains Mono', 'Fira Code', monospace"
           >
             {chipDef.name}
           </text>
 
-          {/* 引脚 — 左侧 */}
-          {chipDef.leftPins.map((pinName, idx) => {
-            const y = ROW_START_Y + idx * 28
-            const isHovered = hoveredPin === `left-${idx}`
-            const assignment = pinMap.get(pinName)
-            const hasConnection = !!assignment
-            const { pinColor, fill, stroke, textFill } = getPinStyles(pinName, isHovered, hasConnection)
-
-            return (
-              <g key={`left-${idx}`}>
-                {/* 引脚线 */}
-                <rect
-                  x={(SVG_WIDTH - CHIP_WIDTH) / 2 - PIN_LENGTH}
-                  y={y - 7}
-                  width={PIN_LENGTH}
-                  height={14}
-                  rx={3}
-                  fill={fill}
-                  stroke={stroke}
-                  strokeWidth={isHovered ? 1.5 : 0.5}
-                  className="cursor-pointer transition-all duration-200"
-                  style={{ transform: isHovered ? 'translateZ(8px)' : undefined }}
-                  onMouseEnter={(e) => handlePinHover(pinName, 'left', idx, e)}
-                  onMouseLeave={handlePinLeave}
-                />
-                {/* 引脚名称 */}
-                <text
-                  x={(SVG_WIDTH - CHIP_WIDTH) / 2 - PIN_LENGTH - 4}
-                  y={y + 1}
-                  textAnchor="end"
-                  fill={textFill}
-                  fontSize={8}
-                  fontFamily="JetBrains Mono, monospace"
-                >
-                  {pinName.length > 6 ? pinName.slice(0, 5) + '\u2026' : pinName}
-                </text>
-                {/* 连接点 */}
-                {hasConnection && (
-                  <circle
-                    cx={(SVG_WIDTH - CHIP_WIDTH) / 2 - PIN_LENGTH - 2}
-                    cy={y}
-                    r={3}
-                    fill={pinColor}
-                    className="animate-pulse"
-                    style={{ animationDuration: '2s' }}
-                  />
-                )}
-              </g>
-            )
-          })}
-
-          {/* 引脚 — 右侧 */}
-          {chipDef.rightPins.map((pinName, idx) => {
-            const y = ROW_START_Y + idx * 28
-            const isHovered = hoveredPin === `right-${idx}`
-            const assignment = pinMap.get(pinName)
-            const hasConnection = !!assignment
-            const { pinColor, fill, stroke, textFill } = getPinStyles(pinName, isHovered, hasConnection)
-
-            return (
-              <g key={`right-${idx}`}>
-                {/* 引脚线 */}
-                <rect
-                  x={(SVG_WIDTH + CHIP_WIDTH) / 2}
-                  y={y - 7}
-                  width={PIN_LENGTH}
-                  height={14}
-                  rx={3}
-                  fill={fill}
-                  stroke={stroke}
-                  strokeWidth={isHovered ? 1.5 : 0.5}
-                  className="cursor-pointer transition-all duration-200"
-                  style={{ transform: isHovered ? 'translateZ(8px)' : undefined }}
-                  onMouseEnter={(e) => handlePinHover(pinName, 'right', idx, e)}
-                  onMouseLeave={handlePinLeave}
-                />
-                {/* 引脚名称 */}
-                <text
-                  x={(SVG_WIDTH + CHIP_WIDTH) / 2 + PIN_LENGTH + 4}
-                  y={y + 1}
-                  textAnchor="start"
-                  fill={textFill}
-                  fontSize={8}
-                  fontFamily="JetBrains Mono, monospace"
-                >
-                  {pinName.length > 6 ? pinName.slice(0, 5) + '\u2026' : pinName}
-                </text>
-                {/* 连接点 */}
-                {hasConnection && (
-                  <circle
-                    cx={(SVG_WIDTH + CHIP_WIDTH) / 2 + PIN_LENGTH + 2}
-                    cy={y}
-                    r={3}
-                    fill={pinColor}
-                    className="animate-pulse"
-                    style={{ animationDuration: '2s' }}
-                  />
-                )}
-              </g>
-            )
-          })}
-
-          {/* 渐变定义 */}
-          <defs>
-            <linearGradient id="chipGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1e1b4b" />
-              <stop offset="100%" stopColor="#0f0a2e" />
-            </linearGradient>
-            <linearGradient id="chipBorder" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.6" />
-              <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.3" />
-            </linearGradient>
-          </defs>
+          {/* 引脚 */}
+          {renderPins(chipDef.leftPins, 'left')}
+          {renderPins(chipDef.rightPins, 'right')}
         </svg>
       </div>
 
       {/* 图例 */}
-      <div className="flex justify-center gap-4 mt-4 flex-wrap">
+      <div className="flex justify-center gap-5 mt-4 flex-wrap">
         {[
           { label: '电源 (3V3/5V)', color: '#22c55e' },
           { label: '地线 (GND)', color: '#ef4444' },
@@ -324,8 +282,8 @@ export default function PinDiagram({ pins, chipType }: Props) {
           { label: '特殊功能', color: '#8b5cf6' },
         ].map(({ label, color }) => (
           <div key={label} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
-            <span className="text-[10px] text-slate-400">{label}</span>
+            <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+            <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{label}</span>
           </div>
         ))}
       </div>
@@ -333,24 +291,32 @@ export default function PinDiagram({ pins, chipType }: Props) {
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="fixed z-50 px-3 py-2 rounded-xl shadow-2xl border border-indigo-500/30 pointer-events-none"
+          className="fixed z-50 px-4 py-3 rounded-xl shadow-2xl border pointer-events-none"
           style={{
             left: tooltip.x,
-            top: tooltip.y - 8,
+            top: tooltip.y - 10,
             transform: 'translate(-50%, -100%)',
-            background: 'linear-gradient(135deg, rgba(15,23,42,0.98), rgba(30,41,59,0.98))',
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(15,23,42,0.98), rgba(30,41,59,0.98))'
+              : 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(241,245,249,0.98))',
+            borderColor: isDark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.2)',
             backdropFilter: 'blur(16px)',
           }}
         >
-          <div className="text-[10px] font-mono text-slate-400 mb-1">#{tooltip.pin.pinNumber} {tooltip.pin.pinName}</div>
-          <div className="text-xs text-indigo-300 font-medium">{tooltip.pin.function}</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">{'\u2192'} {tooltip.pin.connectedTo}</div>
-          {tooltip.pin.voltage && (
-            <div className="text-[10px] mt-0.5" style={{ color: getPinColor(tooltip.pin.voltage) }}>{tooltip.pin.voltage}</div>
-          )}
-          <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-1.5 overflow-hidden">
-            <div className="w-3 h-3 rotate-45 -mt-1 mx-auto" style={{ background: 'rgba(30,41,59,0.98)', borderRight: '1px solid rgba(99,102,241,0.3)', borderBottom: '1px solid rgba(99,102,241,0.3)' }} />
+          <div className={`text-xs font-mono mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            #{tooltip.pin.pinNumber} {tooltip.pin.pinName}
           </div>
+          <div className={`text-sm font-medium ${isDark ? 'text-indigo-300' : 'text-indigo-600'}`}>
+            {tooltip.pin.function}
+          </div>
+          <div className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            → {tooltip.pin.connectedTo}
+          </div>
+          {tooltip.pin.voltage && (
+            <div className="text-xs mt-0.5" style={{ color: getPinColor(tooltip.pin.voltage) }}>
+              {tooltip.pin.voltage}
+            </div>
+          )}
         </div>
       )}
     </div>
