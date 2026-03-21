@@ -64,7 +64,7 @@ export default function AboutPage() {
             isDark ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
           )}>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            v1.5.0
+            v1.5.1
           </div>
         </div>
 

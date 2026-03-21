@@ -59,6 +59,18 @@ const SECTIONS = [
 
 const CHANGELOG = [
   {
+    version: 'v1.5.1',
+    date: '2026-03-21',
+    badge: 'indigo',
+    changes: [
+      '修复：PDF 导出中文乱码，注册本地中文字体（SimHei）替代默认 Helvetica',
+      '优化：引脚图布局重构 — 加大字号、加宽间距、文字不再被芯片主体遮挡',
+      '优化：引脚图 Tooltip 支持暗色/亮色主题',
+      '优化：start.bat 升级 — 自动检测依赖、自动打开浏览器、显示启动 Banner',
+      '优化：.gitignore 补全（dist/、.env*、IDE 配置、OS 文件等）',
+    ],
+  },
+  {
     version: 'v1.5.0',
     date: '2026-03-21',
     badge: 'cyan',

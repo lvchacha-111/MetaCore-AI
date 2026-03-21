@@ -92,7 +92,7 @@ export default function Sidebar() {
       </button>
 
       {/* 底部版本 */}
-      <div className={cn('mt-2 text-[9px] font-mono', isDark ? 'text-slate-700' : 'text-indigo-300')}>v1.5</div>
+      <div className={cn('mt-2 text-[9px] font-mono', isDark ? 'text-slate-700' : 'text-indigo-300')}>v1.5.1</div>
     </aside>
   )
 }
