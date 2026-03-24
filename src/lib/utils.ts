@@ -7,10 +7,21 @@ export function cn(...inputs: ClassValue[]) {
 
 export function parseJSON<T>(text: string): T | null {
   try {
-    // 去掉可能的 markdown 代码块包裹
-    const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-    return JSON.parse(cleaned) as T
-  } catch {
-    return null
-  }
+    return JSON.parse(text.trim()) as T
+  } catch { /* 继续尝试 */ }
+
+  try {
+    const m = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/)
+    if (m) return JSON.parse(m[1].trim()) as T
+  } catch { /* 继续尝试 */ }
+
+  try {
+    const start = text.search(/[\[{]/)
+    const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'))
+    if (start !== -1 && end > start) {
+      return JSON.parse(text.slice(start, end + 1)) as T
+    }
+  } catch { /* 放弃 */ }
+
+  return null
 }
